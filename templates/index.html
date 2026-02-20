@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0C0C0E;
+            --surface: #161619;
+            --surface-2: #1E1E22;
+            --surface-3: #26262B;
+            --border: #2A2A30;
+            --border-focus: #4A6CF7;
+            --text: #E8E8EC;
+            --text-dim: #8888A0;
+            --text-muted: #55556A;
+            --accent: #4A6CF7;
+            --accent-glow: rgba(74, 108, 247, 0.15);
+            --accent-2: #6C8CFF;
+            --success: #34D399;
+            --success-bg: rgba(52, 211, 153, 0.1);
+            --error: #F87171;
+            --error-bg: rgba(248, 113, 113, 0.1);
+            --warning: #FBBF24;
+            --radius: 10px;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Ambient background ─────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -40%; left: -20%;
+            width: 80vw; height: 80vw;
+            background: radial-gradient(ellipse, rgba(74,108,247,0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -30%; right: -10%;
+            width: 60vw; height: 60vw;
+            background: radial-gradient(ellipse, rgba(108,140,255,0.04) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── Header ─────────────────────────────────────────────── */
+        .header {
+            position: relative; z-index: 1;
+            padding: 32px 40px 0;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .header .logo {
+            width: 36px; height: 36px;
+            background: var(--accent);
+            border-radius: 8px;
+            display: grid; place-items: center;
+            font-family: 'Space Mono', monospace;
+            font-weight: 700;
+            font-size: 16px;
+            color: #fff;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+        .header .badge {
+            margin-left: auto;
+            font-size: 11px;
+            font-family: 'Space Mono', monospace;
+            color: var(--text-muted);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 100px;
+        }
+
+        /* ── Stepper ────────────────────────────────────────────── */
+        .stepper {
+            position: relative; z-index: 1;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            padding: 28px 40px 0;
+            max-width: 720px;
+        }
+        .step-item {
+            display: flex; align-items: center; gap: 10px;
+            cursor: pointer;
+            opacity: 0.35;
+            transition: opacity 0.3s;
+        }
+        .step-item.active, .step-item.completed { opacity: 1; }
+        .step-num {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            display: grid; place-items: center;
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            transition: all 0.3s;
+        }
+        .step-item.active .step-num {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+        .step-item.completed .step-num {
+            border-color: var(--success);
+            background: var(--success);
+            color: var(--bg);
+        }
+        .step-item.completed .step-num::after { content: '✓'; }
+        .step-item.completed .step-num span { display: none; }
+        .step-label {
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .step-connector {
+            flex: 0 0 40px;
+            height: 2px;
+            background: var(--border);
+            margin: 0 6px;
+            border-radius: 1px;
+            position: relative;
+        }
+        .step-connector.completed { background: var(--success); }
+
+        /* ── Main container ─────────────────────────────────────── */
+        .main {
+            position: relative; z-index: 1;
+            padding: 28px 40px 60px;
+            max-width: 900px;
+        }
+
+        /* ── Step panels ────────────────────────────────────────── */
+        .step-panel {
+            display: none;
+            animation: fadeSlide 0.35s ease;
+        }
+        .step-panel.active { display: block; }
+
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: -0.4px;
+        }
+        .panel-subtitle {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-bottom: 28px;
+            line-height: 1.5;
+        }
+
+        /* ── Cards ──────────────────────────────────────────────── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card-label {
+            font-size: 11px;
+            font-family: 'Space Mono', monospace;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 14px;
+        }
+
+        /* ── Drop zone ──────────────────────────────────────────── */
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: 48px 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: var(--surface);
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .dropzone.uploaded {
+            border-color: var(--success);
+            border-style: solid;
+            background: var(--success-bg);
+        }
+        .dropzone-icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+            opacity: 0.6;
+        }
+        .dropzone-text {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+        .dropzone-text strong { color: var(--accent); cursor: pointer; }
+        .dropzone-filename {
+            margin-top: 10px;
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            color: var(--success);
+        }
+        .dropzone-meta {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ── Form elements ──────────────────────────────────────── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .form-grid.cols-1 { grid-template-columns: 1fr; }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group.full { grid-column: 1 / -1; }
+
+        label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-dim);
+        }
+
+        input, select {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 14px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        input::placeholder { color: var(--text-muted); }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238888A0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 34px;
+        }
+
+        /* ── Buttons ────────────────────────────────────────────── */
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 28px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 24px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--accent-2); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-secondary {
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--surface-3); }
+        .btn-success {
+            background: var(--success);
+            color: var(--bg);
+        }
+        .btn-success:hover { filter: brightness(1.1); }
+
+        /* ── PM Rule builder ────────────────────────────────────── */
+        .pm-rule {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .pm-rule .remove-rule {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: none; border: none;
+            color: var(--error);
+            cursor: pointer;
+            font-size: 18px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+        .pm-rule .remove-rule:hover { opacity: 1; }
+
+        /* ── Results ────────────────────────────────────────────── */
+        .result-file {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+            transition: border-color 0.2s;
+        }
+        .result-file:hover { border-color: var(--accent); }
+        .result-file .file-icon {
+            width: 36px; height: 36px;
+            background: rgba(74, 108, 247, 0.12);
+            border-radius: 8px;
+            display: grid; place-items: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .result-file .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .result-file .btn { padding: 7px 16px; font-size: 12px; }
+
+        /* ── Spinner ────────────────────────────────────────────── */
+        .spinner {
+            display: inline-block;
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Toast ──────────────────────────────────────────────── */
+        .toast {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            padding: 14px 20px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 999;
+            animation: toastIn 0.3s ease;
+            max-width: 400px;
+        }
+        .toast.error { background: var(--error-bg); border: 1px solid var(--error); color: var(--error); }
+        .toast.success { background: var(--success-bg); border: 1px solid var(--success); color: var(--success); }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Responsive ─────────────────────────────────────────── */
+        @media (max-width: 700px) {
+            .header, .stepper, .main { padding-left: 20px; padding-right: 20px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .form-grid.cols-3 { grid-template-columns: 1fr; }
+            .stepper { overflow-x: auto; }
+            .step-label { display: none; }
+        }
+
+        /* ── Column tag picker ──────────────────────────────────── */
+        .tag-picker {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag-picker .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .tag-picker .tag:hover { border-color: var(--text-dim); }
+        .tag-picker .tag.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+            color: var(--accent-2);
+        }
+        .tag-picker .tag .tag-num {
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            display: none;
+            place-items: center;
+        }
+        .tag-picker .tag.selected .tag-num { display: grid; }
+
+        .help-text {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+    <div class="logo">IV</div>
+    <h1>Invoice Generator</h1>
+    <span class="badge">v1.0</span>
+</div>
+
+<!-- Step indicator -->
+<div class="stepper" id="stepper">
+    <div class="step-item active" data-step="1">
+        <div class="step-num"><span>1</span></div>
+        <span class="step-label">Upload Files</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item" data-step="2">
+        <div class="step-num"><span>2</span></div>
+        <span class="step-label">Map Columns</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item" data-step="3">
+        <div class="step-num"><span>3</span></div>
+        <span class="step-label">Template Config</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item" data-step="4">
+        <div class="step-num"><span>4</span></div>
+        <span class="step-label">PM Pricing</span>
+    </div>
+    <div class="step-connector"></div>
+    <div class="step-item" data-step="5">
+        <div class="step-num"><span>5</span></div>
+        <span class="step-label">Generate</span>
+    </div>
+</div>
+
+<!-- Main content -->
+<div class="main">
+
+    <!-- ════════ STEP 1: Upload Files ════════ -->
+    <div class="step-panel active" id="step-1">
+        <h2 class="panel-title">Upload your files</h2>
+        <p class="panel-subtitle">Upload the consolidated data file and the invoice template to get started.</p>
+
+        <div class="card">
+            <div class="card-label">Consolidated Data (Excel/CSV)</div>
+            <div class="dropzone" id="dz-conso" onclick="document.getElementById('file-conso').click()">
+                <div class="dropzone-icon">📊</div>
+                <div class="dropzone-text">
+                    Drag & drop or <strong>browse</strong>
+                </div>
+                <div class="dropzone-filename" id="conso-filename"></div>
+                <div class="dropzone-meta" id="conso-meta"></div>
+                <input type="file" id="file-conso" accept=".xlsx,.xls,.csv" hidden>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Invoice Template (.xlsx)</div>
+            <div class="dropzone" id="dz-template" onclick="document.getElementById('file-template').click()">
+                <div class="dropzone-icon">📋</div>
+                <div class="dropzone-text">
+                    Drag & drop or <strong>browse</strong>
+                </div>
+                <div class="dropzone-filename" id="template-filename"></div>
+                <div class="dropzone-meta" id="template-meta"></div>
+                <input type="file" id="file-template" accept=".xlsx" hidden>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-primary" id="btn-step1-next" disabled onclick="goStep(2)">
+                Continue →
+            </button>
+        </div>
+    </div>
+
+    <!-- ════════ STEP 2: Map Columns ════════ -->
+    <div class="step-panel" id="step-2">
+        <h2 class="panel-title">Map your columns</h2>
+        <p class="panel-subtitle">Tell us which columns in your data correspond to each role.</p>
+
+        <div class="card">
+            <div class="card-label">Column Mapping</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Editor Column</label>
+                    <select id="col-editor"><option value="">Select...</option></select>
+                    <span class="help-text">Identifies each editor (one invoice per editor)</span>
+                </div>
+                <div class="form-group">
+                    <label>Level 1 — Type Column</label>
+                    <select id="col-type"><option value="">Select...</option></select>
+                    <span class="help-text">Top-level grouping (e.g. work type)</span>
+                </div>
+                <div class="form-group">
+                    <label>Level 2 — Name Column</label>
+                    <select id="col-name"><option value="">Select...</option></select>
+                    <span class="help-text">Sub-grouping within each type</span>
+                </div>
+                <div class="form-group">
+                    <label>Invoice Number Column</label>
+                    <select id="col-inv-no"><option value="">Select... (optional)</option></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Line-Item Columns (select exactly 5 in order)</div>
+            <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px;">
+                Order: Title → Chapter Number → Dispatched Pages → Rate → Amount
+            </p>
+            <div class="tag-picker" id="req-cols-picker"></div>
+            <div id="req-cols-order" style="margin-top:10px; font-family:'Space Mono',monospace; font-size:12px; color:var(--text-muted);"></div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+            <button class="btn btn-primary" id="btn-step2-next" onclick="validateStep2()">Continue →</button>
+        </div>
+    </div>
+
+    <!-- ════════ STEP 3: Template Configuration ════════ -->
+    <div class="step-panel" id="step-3">
+        <h2 class="panel-title">Template configuration</h2>
+        <p class="panel-subtitle">Configure which sheets and cells in your template to populate.</p>
+
+        <div class="card">
+            <div class="card-label">Sheet Names</div>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Worksheet (Detail) Sheet</label>
+                    <select id="cfg-ws-sheet"></select>
+                    <span class="help-text">Sheet for detailed line items</span>
+                </div>
+                <div class="form-group">
+                    <label>Invoice (Summary) Sheet</label>
+                    <select id="cfg-inv-sheet"></select>
+                    <span class="help-text">Sheet for the invoice summary</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-label">Cell Positions</div>
+            <div class="form-grid cols-3">
+                <div class="form-group">
+                    <label>Starting Cell (WS)</label>
+                    <input id="cfg-start-cell" value="A3" placeholder="e.g. A3">
+                </div>
+                <div class="form-group">
+                    <label>Table Name</label>
+                    <select id="cfg-table-name"><option value="">None</option></select>
+                    <span class="help-text">Named table in template (optional)</span>
+                </div>
+                <div class="form-group">
+                    <label>Currency Prefix</label>
+                    <input id="cfg-currency" value="SGD" placeholder="e.g. SGD, USD">
+                </div>
+                <div class="form-group">
+                    <label>Invoice No. Cell (INV)</label>
+                    <input id="cfg-inv-no-cell" value="B3">
+                </div>
+                <div class="form-group">
+                    <label>Invoice Date Cell (INV)</label>
+                    <input id="cfg-inv-dt-cell" value="B5">
+                </div>
+                <div class="form-group">
+                    <label>Invoice Date Value</label>
+                    <input id="cfg-inv-dt" type="date">
+                </div>
+                <div class="form-group">
+                    <label>Editor Name Cell (INV)</label>
+                    <input id="cfg-editor-cell" value="A37">
+                </div>
+                <div class="form-group">
+                    <label>Amount in Words Cell (INV)</label>
+                    <input id="cfg-amt-words-cell" value="A40">
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+            <button class="btn btn-primary" onclick="goStep(4)">Continue →</button>
+        </div>
+    </div>
+
+    <!-- ════════ STEP 4: PM Pricing Rules ════════ -->
+    <div class="step-panel" id="step-4">
+        <h2 class="panel-title">PM Pricing Rules</h2>
+        <p class="panel-subtitle">
+            Optional: define special pricing for project-management work types.
+            These types get a base fee up to a page limit, with optional per-page overage.
+        </p>
+
+        <div id="pm-rules-container"></div>
+
+        <button class="btn btn-secondary" onclick="addPmRule()" style="margin-bottom:8px;">+ Add Pricing Rule</button>
+
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="goStep(3)">← Back</button>
+            <button class="btn btn-primary" onclick="goStep(5)">Continue →</button>
+        </div>
+    </div>
+
+    <!-- ════════ STEP 5: Generate ════════ -->
+    <div class="step-panel" id="step-5">
+        <h2 class="panel-title">Review & Generate</h2>
+        <p class="panel-subtitle">Everything looks good? Hit generate to create your invoices.</p>
+
+        <div class="card" id="summary-card">
+            <div class="card-label">Configuration Summary</div>
+            <div id="config-summary" style="font-size:13px; line-height:1.8; color:var(--text-dim);"></div>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="goStep(4)">← Back</button>
+            <button class="btn btn-primary" id="btn-generate" onclick="generateInvoices()">
+                ⚡ Generate Invoices
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div id="results-section" style="display:none; margin-top:32px;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                <h3 style="font-size:18px; font-weight:700;">Generated Files</h3>
+                <button class="btn btn-success" onclick="downloadAll()">📦 Download All (ZIP)</button>
+            </div>
+            <div id="results-list"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ───────────── State ─────────────
+    let currentStep = 1;
+    let consoColumns = [];
+    let templateSheets = [];
+    let templateTables = {};
+    let selectedReqCols = [];
+    let consoUploaded = false;
+    let templateUploaded = false;
+
+    // ───────────── Navigation ─────────────
+    function goStep(n) {
+        document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+        document.getElementById(`step-${n}`).classList.add('active');
+
+        document.querySelectorAll('.step-item').forEach(s => {
+            const sn = parseInt(s.dataset.step);
+            s.classList.remove('active', 'completed');
+            if (sn < n) s.classList.add('completed');
+            if (sn === n) s.classList.add('active');
+        });
+        document.querySelectorAll('.step-connector').forEach((c, i) => {
+            c.classList.toggle('completed', i < n - 1);
+        });
+
+        currentStep = n;
+        if (n === 5) buildSummary();
+    }
+
+    // ───────────── Toast ─────────────
+    function toast(msg, type = 'error') {
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+    }
+
+    // ───────────── Dropzone setup ─────────────
+    function setupDrop(dzId, inputId, uploadFn) {
+        const dz = document.getElementById(dzId);
+        const inp = document.getElementById(inputId);
+        ['dragenter', 'dragover'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('dragover'); }));
+        ['dragleave', 'drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('dragover'); }));
+        dz.addEventListener('drop', ev => { inp.files = ev.dataTransfer.files; uploadFn(); });
+        inp.addEventListener('change', uploadFn);
+    }
+
+    function checkStep1() {
+        document.getElementById('btn-step1-next').disabled = !(consoUploaded && templateUploaded);
+    }
+
+    // ───────────── Upload handlers ─────────────
+    function uploadConso() {
+        const file = document.getElementById('file-conso').files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        const dz = document.getElementById('dz-conso');
+        dz.querySelector('.dropzone-text').innerHTML = '<span class="spinner"></span> Uploading...';
+
+        fetch('/upload-conso', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { toast(data.error); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; return; }
+                consoColumns = data.columns;
+                consoUploaded = true;
+                dz.classList.add('uploaded');
+                dz.querySelector('.dropzone-icon').textContent = '✅';
+                dz.querySelector('.dropzone-text').innerHTML = '';
+                document.getElementById('conso-filename').textContent = data.filename;
+                document.getElementById('conso-meta').textContent = `${data.rows} rows · ${data.columns.length} columns`;
+                populateColumnDropdowns();
+                checkStep1();
+            })
+            .catch(() => { toast('Upload failed'); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; });
+    }
+
+    function uploadTemplate() {
+        const file = document.getElementById('file-template').files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        const dz = document.getElementById('dz-template');
+        dz.querySelector('.dropzone-text').innerHTML = '<span class="spinner"></span> Uploading...';
+
+        fetch('/upload-template', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { toast(data.error); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; return; }
+                templateSheets = data.sheets;
+                templateTables = data.tables;
+                templateUploaded = true;
+                dz.classList.add('uploaded');
+                dz.querySelector('.dropzone-icon').textContent = '✅';
+                dz.querySelector('.dropzone-text').innerHTML = '';
+                document.getElementById('template-filename').textContent = data.filename;
+                document.getElementById('template-meta').textContent = `${data.sheets.length} sheets: ${data.sheets.join(', ')}`;
+                populateSheetDropdowns();
+                checkStep1();
+            })
+            .catch(() => { toast('Upload failed'); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; });
+    }
+
+    setupDrop('dz-conso', 'file-conso', uploadConso);
+    setupDrop('dz-template', 'file-template', uploadTemplate);
+
+    // ───────────── Populate dropdowns ─────────────
+    function populateColumnDropdowns() {
+        const selects = ['col-editor', 'col-type', 'col-name', 'col-inv-no'];
+        selects.forEach(id => {
+            const sel = document.getElementById(id);
+            const first = sel.options[0].textContent;
+            sel.innerHTML = `<option value="">${first}</option>`;
+            consoColumns.forEach(c => {
+                sel.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+        });
+
+        // Auto-select common names
+        const autoMap = { 'col-editor': 'SG editor', 'col-type': 'Type', 'col-name': 'Name', 'col-inv-no': 'Invoice no.' };
+        Object.entries(autoMap).forEach(([id, val]) => {
+            const sel = document.getElementById(id);
+            for (let o of sel.options) { if (o.value === val) { sel.value = val; break; } }
+        });
+
+        // Build tag picker for required columns
+        const picker = document.getElementById('req-cols-picker');
+        picker.innerHTML = '';
+        selectedReqCols = [];
+        consoColumns.forEach(c => {
+            const tag = document.createElement('div');
+            tag.className = 'tag';
+            tag.innerHTML = `<div class="tag-num"></div>${c}`;
+            tag.onclick = () => toggleReqCol(c, tag);
+            picker.appendChild(tag);
+        });
+
+        // Auto-select default required columns
+        const defaults = ['Title', 'Chapter number', 'Dispatched pages', 'Rate', 'Amount'];
+        defaults.forEach(d => {
+            const tags = picker.querySelectorAll('.tag');
+            tags.forEach(t => { if (t.textContent.trim() === d) { t.click(); } });
+        });
+    }
+
+    function toggleReqCol(col, tagEl) {
+        const idx = selectedReqCols.indexOf(col);
+        if (idx >= 0) {
+            selectedReqCols.splice(idx, 1);
+            tagEl.classList.remove('selected');
+        } else {
+            if (selectedReqCols.length >= 5) {
+                toast('Already selected 5 columns. Remove one first.');
+                return;
+            }
+            selectedReqCols.push(col);
+            tagEl.classList.add('selected');
+        }
+        // Update numbers
+        document.querySelectorAll('#req-cols-picker .tag').forEach(t => {
+            const name = t.textContent.trim();
+            const i = selectedReqCols.indexOf(name);
+            const numEl = t.querySelector('.tag-num');
+            if (i >= 0) { numEl.textContent = i + 1; } else { numEl.textContent = ''; }
+        });
+        document.getElementById('req-cols-order').textContent = selectedReqCols.length
+            ? `Order: ${selectedReqCols.join(' → ')}`
+            : '';
+    }
+
+    function populateSheetDropdowns() {
+        ['cfg-ws-sheet', 'cfg-inv-sheet'].forEach(id => {
+            const sel = document.getElementById(id);
+            sel.innerHTML = '';
+            templateSheets.forEach(s => { sel.innerHTML += `<option value="${s}">${s}</option>`; });
+        });
+        // Auto-select WS and INV
+        const ws = document.getElementById('cfg-ws-sheet');
+        const inv = document.getElementById('cfg-inv-sheet');
+        templateSheets.forEach(s => {
+            if (s.toUpperCase() === 'WS') ws.value = s;
+            if (s.toUpperCase() === 'INV') inv.value = s;
+        });
+
+        // Populate table dropdown
+        const tblSel = document.getElementById('cfg-table-name');
+        tblSel.innerHTML = '<option value="">None</option>';
+        Object.values(templateTables).flat().forEach(t => {
+            tblSel.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+        // Auto-select "invoice"
+        for (let o of tblSel.options) { if (o.value === 'invoice') { tblSel.value = 'invoice'; break; } }
+    }
+
+    // ───────────── Step 2 validation ─────────────
+    function validateStep2() {
+        const editor = document.getElementById('col-editor').value;
+        const type = document.getElementById('col-type').value;
+        const name = document.getElementById('col-name').value;
+        if (!editor || !type || !name) { toast('Please select Editor, Type, and Name columns.'); return; }
+        if (selectedReqCols.length !== 5) { toast('Please select exactly 5 line-item columns.'); return; }
+        goStep(3);
+    }
+
+    // ───────────── PM Rules ─────────────
+    let pmRuleCount = 0;
+    function addPmRule() {
+        pmRuleCount++;
+        const id = pmRuleCount;
+        const div = document.createElement('div');
+        div.className = 'pm-rule';
+        div.id = `pm-rule-${id}`;
+        div.innerHTML = `
+            <button class="remove-rule" onclick="document.getElementById('pm-rule-${id}').remove()">✕</button>
+            <div class="form-grid">
+                <div class="form-group full">
+                    <label>Type Name (must match exactly)</label>
+                    <input class="pm-type" placeholder="e.g. Book Reformat PM with EA services">
+                </div>
+                <div class="form-group">
+                    <label>Page Limit</label>
+                    <input class="pm-page-limit" type="number" value="200">
+                </div>
+                <div class="form-group">
+                    <label>Base Fee (up to page limit)</label>
+                    <input class="pm-base-fee" type="number" value="360">
+                </div>
+                <div class="form-group">
+                    <label>Overage Basis</label>
+                    <select class="pm-overage-basis">
+                        <option value="rate">Per-page rate</option>
+                        <option value="ad-hoc">Flat ad-hoc fee</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Overage Rate/Fee</label>
+                    <input class="pm-overage-rate" type="number" step="0.01" value="0.70">
+                </div>
+            </div>
+        `;
+        document.getElementById('pm-rules-container').appendChild(div);
+    }
+
+    function getPmRules() {
+        const rules = [];
+        document.querySelectorAll('.pm-rule').forEach(el => {
+            rules.push({
+                type_name: el.querySelector('.pm-type').value,
+                page_limit: el.querySelector('.pm-page-limit').value,
+                base_fee: el.querySelector('.pm-base-fee').value,
+                overage_basis: el.querySelector('.pm-overage-basis').value,
+                overage_rate: el.querySelector('.pm-overage-rate').value,
+            });
+        });
+        return rules;
+    }
+
+    // ───────────── Summary ─────────────
+    function buildSummary() {
+        const s = document.getElementById('config-summary');
+        const dtVal = document.getElementById('cfg-inv-dt').value;
+        const dtFormatted = dtVal ? new Date(dtVal).toLocaleDateString('en-GB') : '(not set)';
+        s.innerHTML = `
+            <strong style="color:var(--text)">Column Mapping:</strong><br>
+            Editor: <code>${document.getElementById('col-editor').value}</code> · 
+            Type: <code>${document.getElementById('col-type').value}</code> · 
+            Name: <code>${document.getElementById('col-name').value}</code><br>
+            Line items: <code>${selectedReqCols.join(', ')}</code><br><br>
+            <strong style="color:var(--text)">Template:</strong><br>
+            WS Sheet: <code>${document.getElementById('cfg-ws-sheet').value}</code> · 
+            INV Sheet: <code>${document.getElementById('cfg-inv-sheet').value}</code><br>
+            Starting cell: <code>${document.getElementById('cfg-start-cell').value}</code> · 
+            Currency: <code>${document.getElementById('cfg-currency').value}</code><br>
+            Invoice date: <code>${dtFormatted}</code><br><br>
+            <strong style="color:var(--text)">PM Rules:</strong> ${getPmRules().length || 'None'}
+        `;
+    }
+
+    // ───────────── Generate ─────────────
+    function generateInvoices() {
+        const btn = document.getElementById('btn-generate');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+        const dtVal = document.getElementById('cfg-inv-dt').value;
+        let dtFormatted = '';
+        if (dtVal) {
+            const d = new Date(dtVal);
+            dtFormatted = `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+        }
+
+        const payload = {
+            editor_col: document.getElementById('col-editor').value,
+            level_1_header: document.getElementById('col-type').value,
+            level_2_header: document.getElementById('col-name').value,
+            inv_col_name: document.getElementById('col-inv-no').value,
+            required_columns: selectedReqCols,
+            sheet_name: document.getElementById('cfg-ws-sheet').value,
+            inv_sheet_name: document.getElementById('cfg-inv-sheet').value,
+            starting_cell: document.getElementById('cfg-start-cell').value,
+            table_name: document.getElementById('cfg-table-name').value,
+            currency_prefix: document.getElementById('cfg-currency').value,
+            inv_no_cell: document.getElementById('cfg-inv-no-cell').value,
+            inv_dt_cell: document.getElementById('cfg-inv-dt-cell').value,
+            inv_dt: dtFormatted,
+            editor_name_cell: document.getElementById('cfg-editor-cell').value,
+            inv_total_amt_cell: document.getElementById('cfg-amt-words-cell').value,
+            pm_rules: getPmRules(),
+        };
+
+        fetch('/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '⚡ Generate Invoices';
+            if (data.error) {
+                toast(data.error);
+                console.error(data.trace);
+                return;
+            }
+            toast(`✅ Generated ${data.count} invoice(s)!`, 'success');
+            showResults(data.files);
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '⚡ Generate Invoices';
+            toast('Generation failed: ' + err.message);
+        });
+    }
+
+    function showResults(files) {
+        const sec = document.getElementById('results-section');
+        const list = document.getElementById('results-list');
+        sec.style.display = 'block';
+        list.innerHTML = '';
+        files.forEach(f => {
+            list.innerHTML += `
+                <div class="result-file">
+                    <div class="file-icon">📄</div>
+                    <span class="file-name">${f}</span>
+                    <a class="btn btn-secondary" href="/download/${encodeURIComponent(f)}" download>Download</a>
+                </div>`;
+        });
+    }
+
+    function downloadAll() {
+        window.location.href = '/download-all';
+    }
+</script>
+</body>
+</html>
