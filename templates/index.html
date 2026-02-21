@@ -725,7 +725,22 @@
         t.className = `toast ${type}`;
         t.textContent = msg;
         document.body.appendChild(t);
-        setTimeout(() => t.remove(), 4000);
+        setTimeout(() => t.remove(), 6000);
+    }
+
+    // ───────────── Safe JSON parser ─────────────
+    // Prevents "Unexpected token '<'" crash when server returns HTML error pages
+    async function safeJson(response) {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            // Server returned HTML (e.g. an error page) instead of JSON
+            if (text.includes('re-upload') || text.includes('not found')) {
+                return { error: 'Session expired. Please go back to Step 1 and re-upload your files.' };
+            }
+            return { error: `Server error (HTTP ${response.status}). Please re-upload your files and try again.` };
+        }
     }
 
     // ───────────── Dropzone setup ─────────────
@@ -752,7 +767,7 @@
         dz.querySelector('.dropzone-text').innerHTML = '<span class="spinner"></span> Uploading...';
 
         fetch('/upload-conso', { method: 'POST', body: fd })
-            .then(r => r.json())
+            .then(r => safeJson(r))
             .then(data => {
                 if (data.error) { toast(data.error); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; return; }
                 consoColumns = data.columns;
@@ -777,7 +792,7 @@
         dz.querySelector('.dropzone-text').innerHTML = '<span class="spinner"></span> Uploading...';
 
         fetch('/upload-template', { method: 'POST', body: fd })
-            .then(r => r.json())
+            .then(r => safeJson(r))
             .then(data => {
                 if (data.error) { toast(data.error); dz.querySelector('.dropzone-text').innerHTML = 'Drag & drop or <strong>browse</strong>'; return; }
                 templateSheets = data.sheets;
@@ -1006,12 +1021,16 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         })
-        .then(r => r.json())
+        .then(r => safeJson(r))
         .then(data => {
             btn.disabled = false;
             btn.innerHTML = '⚡ Generate Invoices';
             if (data.error) {
                 toast(data.error);
+                // If it's a session/file issue, take user back to Step 1
+                if (data.error.includes('re-upload') || data.error.includes('not found')) {
+                    setTimeout(() => goStep(1), 2000);
+                }
                 console.error(data.trace);
                 return;
             }
